@@ -1,0 +1,139 @@
+---
+title: "OCA Detailed Report"
+output: 
+  html_document:
+    theme: flatly
+params:
+  df: NA
+---
+
+### 1. Summary
+
+```{r, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+# library(knitr)
+# library(tinytex)
+# options(tinytex.verbose = TRUE)
+```
+
+<style>
+  .col2 {
+    columns: 2 200px;         /* number of columns and width in pixels*/
+    -webkit-columns: 2 200px; /* chrome, safari */
+    -moz-columns: 2 200px;    /* firefox */
+  }
+</style>
+
+<div class = "col2">
+</div>
+
+This report provides the following information of the selected courts:
+
+* Pending cases at the end of each month
+* Monthly case inflow and outflow from January 2018 to December 2018
+
+
+```{r echo = FALSE, message = FALSE}
+# var takes one of the values: PE, PB, inflow, outflow, newcases, decidedcases
+var_plot <- function (court, var) {
+
+  assigned_var <- case_when(var == "PE" ~ "PENDING_ENDING_",
+                            var == "PB" ~ "PENDING_BEGINNING_",
+                            var == "inflow" ~ "CASE_INFLOW_",
+                            var == "outflow" ~ "CASE_OUTFLOW_")
+  
+  assigned_title <- case_when(var == "PE" ~ "Pending Cases (Ending)",
+                              var == "PB" ~ "Pending Cases (Beginning)",
+                              var == "inflow" ~ "Case Inflow",
+                              var == "outflow" ~ "Case Outflow")
+  
+  if (is.null(assigned_var)) {
+    return(NULL)
+  }
+  
+  # 
+  temp_df <- court %>% 
+      select(starts_with(assigned_var)) %>% 
+      rename_all(list(~ gsub(assigned_var, "", .))) %>% 
+      select((which(names(.) == court$LAST_PENDING) - 11):
+               which(names(.) == court$LAST_PENDING)) %>% 
+      t() %>% 
+      as.data.frame() %>% 
+      mutate(month = rownames(.)) %>% 
+      rename(`Pending Cases` = V1)
+    
+  temp_plot <- temp_df %>% 
+      ggplot(aes(x = month, y = `Pending Cases`)) + 
+      geom_line(size = 2, color = "steelblue") + 
+      labs(title = paste("Monthly", assigned_title),
+           x = "month", y = assigned_title) +
+      theme(axis.text.x = element_text(angle = 90, vjust=0.5, size = 8),
+            legend.position = "bottom")
+  
+  return(temp_plot)
+}
+
+# vartype can be either "pending" or "caseflow" or "newdecided"
+vars_plot <- function (court, vartype) {
+
+  filter_label <- case_when(vartype == "pending" ~ "PENDING",
+                            vartype == "caseflow" ~ "CASE_INFLOW|CASE_OUTFLOW")
+
+  assigned_title <- case_when(vartype == "pending" ~ "Pending Cases",
+                              vartype == "caseflow" ~ "Caseflow")
+  
+  assigned_labels <- 
+    case_when(vartype == "pending" ~ 
+                c("Pending Cases (Beginning)", "Pending Cases (Ending)"),
+              vartype == "caseflow" ~ c("Case Inflow", "Case Outflow"))
+    
+  temp_df <- court %>% 
+    select(matches(filter_label)) %>%
+    select(contains("2018")) %>% 
+    select(-c(25, 26)) %>% 
+    t() %>% as.data.frame() %>% 
+    rownames_to_column("varname") %>% 
+    mutate(varname = gsub("[[:digit:]]+", "", varname)) %>% 
+    rename(value = V1) %>% 
+    group_by(varname) %>% 
+    mutate(month = row_number(varname))
+  
+  temp_plot <- temp_df %>% 
+    ggplot(aes(x = month, y = value, color = varname)) + 
+    geom_line(size = 2) + 
+    labs(title = paste("Monthly", assigned_title), 
+         x = "month", y = assigned_title, color = NULL) +
+    scale_color_manual(labels = assigned_labels, 
+                     values = c("#00ba38", "#f8766d")) + 
+    scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12),
+                      labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) +
+    theme(axis.text.x = element_text(angle = 0, vjust=0.5, size = 8),
+          legend.position = "bottom")
+  
+  return(temp_plot)
+}
+```
+
+```{r echo = FALSE, results = "asis", fig.height = 3, fig.align = "center"}
+
+for (i in 1:nrow(params$df)) {
+  temp_court <- params$df[i,]
+  cat('\n# ', i, ". ", temp_court$station_name, '\n', sep = "")
+  
+  cat('\n\n')
+  
+  plot1 <- vars_plot(temp_court, vartype = "caseflow")
+  
+  grid.arrange(plot1, ncol = 1)
+  
+  cat('\n\n')  
+}
+
+cat('\n\n')
+
+```
+
+

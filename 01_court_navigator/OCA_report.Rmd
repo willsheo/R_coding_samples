@@ -1,0 +1,25 @@
+---
+title: "OCA Report"
+output: 
+  html_document
+params:
+  df: NA
+---
+
+### 1. Summary
+
+```{r, include=FALSE}
+library(knitr)
+library(tinytex)
+options(tinytex.verbose = TRUE)
+```
+
+This report provides a list of courts that appear to be overburdened. The courts were selected based on the following criteria:
+
+* the number of pending cases
+* the disposition rate
+
+
+```{r echo = FALSE}
+kable(params$df, caption = "List of Potentially Burdened Courts")
+```
